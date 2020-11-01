@@ -2,6 +2,8 @@
 
 import Swiper from "https://unpkg.com/swiper/swiper-bundle.esm.browser.min.js";
 
+const ERROR_COLOR = "#ff0000";
+
 const cartButton = document.querySelector("#cart-button");
 const modal = document.querySelector(".modal");
 const close = document.querySelector(".close");
@@ -19,15 +21,32 @@ const restaurants = document.querySelector(".restaurants");
 const menu = document.querySelector(".menu");
 const logo = document.querySelector(".logo");
 const cardsMenu = document.querySelector(".cards-menu");
+const restaurantTitle = document.querySelector(".restaurant-title");
+const restaurantRating = document.querySelector(".rating");
+const restaurantPrice = document.querySelector(".price");
+const restaurantCategory = document.querySelector(".category");
+const inputSearch = document.querySelector(".input-search");
 const modalBody = document.querySelector(".modal-body");
 const modalPrice = document.querySelector(".modal-pricetag");
 const buttonClearCart = document.querySelector(".clear-cart");
 
 let login = localStorage.getItem("login");
 
-let cart = [];
-if (localStorage.getItem("cart") != null) {
-  cart = JSON.parse(localStorage.getItem("cart"));
+let cart = JSON.parse(localStorage.getItem(`cart_${login}`)) || [];
+// if (localStorage.getItem("cart") != null) {
+//   cart = JSON.parse(localStorage.getItem("cart"));
+// }
+// localStorage.getItem(`cart_${login}`);
+
+function saveCart() {
+  localStorage.setItem(`cart_${login}`, JSON.stringify(cart));
+}
+
+function downloadCart() {
+  if (localStorage.getItem(`cart_${login}`)) {
+    const data = JSON.parse(localStorage.getItem(`cart_${login}`));
+    cart.push(...data);
+  }
 }
 
 const getData = async (url) => {
@@ -70,6 +89,7 @@ function returnMain() {
 function autorized() {
   function logOut() {
     login = "";
+    clearCart();
     localStorage.removeItem("login");
     buttonAuth.style.display = "";
     userName.style.display = "";
@@ -77,6 +97,7 @@ function autorized() {
     cartButton.style.display = "";
     buttonOut.removeEventListener("click", logOut);
     checkAuth();
+    returnMain();
   }
 
   userName.textContent = login;
@@ -95,15 +116,16 @@ function notAutorized() {
       login = loginInput.value;
       localStorage.setItem("login", login);
       toggleModalAuth();
+      downloadCart();
       buttonAuth.removeEventListener("click", toggleModalAuth);
       closeAuth.removeEventListener("click", toggleModalAuth);
       loginForm.removeEventListener("submit", logIn);
       loginForm.reset();
       checkAuth();
     } else {
-      loginInput.style.borderColor = "#ff0000";
+      loginInput.style.borderColor = ERROR_COLOR;
       loginInput.value = "";
-      passwordInput.style.borderColor = "#ff0000";
+      passwordInput.style.borderColor = ERROR_COLOR;
       passwordInput.value = "";
     }
   }
@@ -241,7 +263,8 @@ function addToCart(event) {
       });
     }
   }
-  localStorage.setItem("cart", JSON.stringify(cart));
+  // localStorage.setItem("cart", JSON.stringify(cart));
+  saveCart();
 }
 
 function renderCart() {
@@ -286,7 +309,13 @@ function changeCount(event) {
       food.count++;
     }
     renderCart();
+    saveCart();
   }
+}
+function clearCart() {
+  cart.length = 0;
+  localStorage.removeItem(`cart_${login}`);
+  renderCart();
 }
 
 function init() {
@@ -301,11 +330,7 @@ function init() {
     toggleModal();
   });
 
-  buttonClearCart.addEventListener("click", () => {
-    cart.length = 0;
-    localStorage.removeItem("cart");
-    renderCart();
-  });
+  buttonClearCart.addEventListener("click", clearCart);
 
   modalBody.addEventListener("click", changeCount);
 
@@ -316,6 +341,51 @@ function init() {
   cardsReataurants.addEventListener("click", openGoods);
 
   logo.addEventListener("click", returnMain);
+
+  inputSearch.addEventListener("keyup", (event) => {
+    const value = event.target.value.trim();
+
+    if (!value) {
+      event.target.style.backgroundColor = ERROR_COLOR;
+      event.target.value = "";
+      setTimeout(() => {
+        event.target.style.backgroundColor = "";
+      }, 1500);
+      return;
+    }
+
+    if (value.length < 3) {
+      return;
+    }
+
+    getData("./db/partners.json")
+      .then((data) => {
+        return data.map((partner) => {
+          return partner.products;
+        });
+      })
+      .then((linksProduct) => {
+        cardsMenu.textContent = "";
+        linksProduct.forEach((link) => {
+          getData(`./db/${link}`).then((data) => {
+            const resultSearch = data.filter((item) => {
+              const name = item.name.toLowerCase();
+              return name.includes(value.toLowerCase());
+            });
+            containerPromo.classList.add("hide");
+            restaurants.classList.add("hide");
+            menu.classList.remove("hide");
+
+            restaurantTitle.textContent = "Результат поиска";
+            restaurantRating.textContent = "";
+            restaurantPrice.textContent = "";
+            restaurantCategory.textContent = "разная кухня";
+
+            resultSearch.forEach(createCardGood);
+          });
+        });
+      });
+  });
 
   checkAuth();
 
